@@ -1,7 +1,3 @@
----
-
-### 3. `app.py`
-```python
 import io
 import re
 import sqlite3
