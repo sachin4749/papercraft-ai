@@ -131,22 +131,30 @@ def get_unique_subjects() -> List[str]:
     return [r[0] for r in rows if r[0]]
 
 # ==========================================
-# 2. ADVANCED BACKEND AI ENGINES
+# 2. ADVANCED BACKEND AI ENGINES (STREAMLIT SECRETS)
 # ==========================================
 
 def get_openai_client():
+    api_key = None
     try:
-        api_key = st.secrets.get("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            return None
-        return OpenAI(api_key=api_key)
+        # First check Streamlit Platform Secrets
+        if "OPENAI_API_KEY" in st.secrets:
+            api_key = st.secrets["OPENAI_API_KEY"]
     except Exception:
+        pass
+    
+    # Fallback to Environment Variable if local
+    if not api_key:
+        api_key = os.getenv("OPENAI_API_KEY")
+
+    if not api_key:
         return None
+    return OpenAI(api_key=api_key)
 
 def generate_ai_questions(subject: str, topic: str, count: int, marks: int, is_mcq: bool) -> List[Dict[str, Any]]:
     client = get_openai_client()
     if not client:
-        st.error("OpenAI API Key is missing. Please configure OPENAI_API_KEY in Streamlit Secrets.")
+        st.error("OpenAI API Key is missing. Please configure OPENAI_API_KEY in your Streamlit Secrets settings.")
         return []
 
     prompt = f"""
@@ -191,7 +199,7 @@ def generate_ai_questions(subject: str, topic: str, count: int, marks: int, is_m
 def analyze_question_pedagogy(question_text: str) -> dict:
     client = get_openai_client()
     if not client:
-        return {"difficulty": "Medium", "blooms_level": "Understand", "reasoning": "API key missing."}
+        return {"difficulty": "Medium", "blooms_level": "Understand", "reasoning": "API key missing in secrets."}
 
     prompt = f"""
     Analyze the following examination question and classify its cognitive level:
