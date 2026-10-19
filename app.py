@@ -41,27 +41,30 @@ from docx.oxml.ns import qn
 DB_FILE = "question_bank.db"
 
 def init_db():
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS question_bank (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            subject TEXT NOT NULL,
-            chapter TEXT,
-            question_text TEXT NOT NULL,
-            is_mcq INTEGER NOT NULL,
-            option_a TEXT,
-            option_b TEXT,
-            option_c TEXT,
-            option_d TEXT,
-            correct_answer TEXT,
-            marks INTEGER NOT NULL,
-            difficulty TEXT,
-            blooms_level TEXT
-        )
-    """)
-    conn.commit()
-    conn.close()
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS question_bank (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                subject TEXT NOT NULL,
+                chapter TEXT,
+                question_text TEXT NOT NULL,
+                is_mcq INTEGER NOT NULL,
+                option_a TEXT,
+                option_b TEXT,
+                option_c TEXT,
+                option_d TEXT,
+                correct_answer TEXT,
+                marks INTEGER NOT NULL,
+                difficulty TEXT,
+                blooms_level TEXT
+            )
+        """)
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"Database initialization warning: {e}")
 
 def save_question_to_db(q_data: Dict[str, Any]):
     conn = sqlite3.connect(DB_FILE)
@@ -132,15 +135,18 @@ def get_unique_subjects() -> List[str]:
 # ==========================================
 
 def get_openai_client():
-    api_key = st.secrets.get("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY")
-    if not api_key:
+    try:
+        api_key = st.secrets.get("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            return None
+        return OpenAI(api_key=api_key)
+    except Exception:
         return None
-    return OpenAI(api_key=api_key)
 
 def generate_ai_questions(subject: str, topic: str, count: int, marks: int, is_mcq: bool) -> List[Dict[str, Any]]:
     client = get_openai_client()
     if not client:
-        st.error("OpenAI API Key is missing. Please set OPENAI_API_KEY in Streamlit Secrets or environment variables.")
+        st.error("OpenAI API Key is missing. Please configure OPENAI_API_KEY in Streamlit Secrets.")
         return []
 
     prompt = f"""
@@ -521,7 +527,7 @@ def inject_glassmorphism_css():
         color: #f8fafc !important;
     }
     [data-testid="stSidebar"] {
-        background: rgba(15, 23, 42, 0.75) !important;
+        background: rgba(15, 23, 42, 0.8) !important;
         backdrop-filter: blur(20px) !important;
     }
     div.glass-card {
@@ -619,7 +625,6 @@ def main():
                 for q_idx, q in enumerate(sec["questions"]):
                     q["text"] = st.text_area(f"Q{q_idx+1} Prompt", value=q["text"], key=f"q_{sec['id']}_{q_idx}")
                     
-                    # AI Pedagogy Audit button per question
                     if st.button(f"🧠 AI Pedagogy Audit Q{q_idx+1}", key=f"audit_btn_{sec['id']}_{q_idx}"):
                         with st.spinner("Analyzing cognitive difficulty & Bloom's level..."):
                             analysis = analyze_question_pedagogy(q["text"])
