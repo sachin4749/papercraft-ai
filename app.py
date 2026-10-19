@@ -131,19 +131,17 @@ def get_unique_subjects() -> List[str]:
     return [r[0] for r in rows if r[0]]
 
 # ==========================================
-# 2. ADVANCED BACKEND AI ENGINES (STREAMLIT SECRETS)
+# 2. ADVANCED BACKEND AI ENGINES
 # ==========================================
 
 def get_openai_client():
     api_key = None
     try:
-        # First check Streamlit Platform Secrets
         if "OPENAI_API_KEY" in st.secrets:
             api_key = st.secrets["OPENAI_API_KEY"]
     except Exception:
         pass
     
-    # Fallback to Environment Variable if local
     if not api_key:
         api_key = os.getenv("OPENAI_API_KEY")
 
@@ -262,11 +260,11 @@ def audit_exam_coverage(syllabus_outline: str, sections_data: list) -> str:
 def init_session_state():
     if "metadata" not in st.session_state:
         st.session_state.metadata = {
-            "institution_name": "ROYAL INSTITUTE OF TECHNOLOGY & SCIENCE",
-            "department": "DEPARTMENT OF COMPUTER SCIENCE & ENGINEERING",
-            "exam_name": "END SEMESTER EXAMINATION - FALL 2026",
+            "institution_name": "",
+            "department": "B.Tech",
+            "exam_name": "Mid Semester Exam",
             "subject_title": "ADVANCED ARTIFICIAL INTELLIGENCE",
-            "subject_code": "CS-8001",
+            "subject_code": "",
             "date": "2026-11-15",
             "duration": "3 Hours",
             "max_marks": 100,
@@ -274,7 +272,7 @@ def init_session_state():
                 "1. All questions in Section A are compulsory.\n"
                 "2. Answer any four questions from Section B.\n"
                 "3. Figures to the right indicate full marks.\n"
-                "4. Use of programmable calculators is strictly prohibited."
+                "4. Scientific calculators are allowed during the examination."
             ),
             "logo_bytes": None
         }
@@ -405,6 +403,9 @@ def generate_pdf_paper(metadata: Dict[str, Any], sections: List[Dict[str, Any]],
     c_primary = colors.HexColor("#0f172a")
     c_secondary = colors.HexColor("#334155")
     
+    inst_display = metadata["institution_name"] if metadata["institution_name"].strip() else "NAME OF INSTITUTION / COLLEGE"
+    dept_display = metadata["department"].upper() if metadata["department"] else "DEPARTMENT"
+
     style_inst = ParagraphStyle('InstHeader', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=14, leading=16, alignment=1, textColor=c_primary)
     style_dept = ParagraphStyle('DeptHeader', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=10, leading=12, alignment=1, textColor=c_secondary)
     style_exam = ParagraphStyle('ExamHeader', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=11, leading=13, alignment=1, textColor=c_primary)
@@ -424,9 +425,9 @@ def generate_pdf_paper(metadata: Dict[str, Any], sections: List[Dict[str, Any]],
             logo_img = None
 
     title_p = [
-        Paragraph(metadata["institution_name"].upper(), style_inst),
+        Paragraph(inst_display.upper(), style_inst),
         Spacer(1, 2),
-        Paragraph(metadata["department"].upper(), style_dept),
+        Paragraph(dept_display, style_dept),
         Spacer(1, 2),
         Paragraph(f"<b>{metadata['exam_name']}</b>" + (" - ANSWER KEY & RUBRIC" if is_answer_key else ""), style_exam)
     ]
@@ -436,8 +437,9 @@ def generate_pdf_paper(metadata: Dict[str, Any], sections: List[Dict[str, Any]],
     story.append(Spacer(1, 8))
     story.append(HRFlowable(width="100%", thickness=1.5, color=c_primary, spaceBefore=2, spaceAfter=8))
 
+    subj_code_display = metadata['subject_code'] if metadata['subject_code'].strip() else "N/A"
     meta_table_data = [
-        [Paragraph(f"<b>Course / Subject:</b> {metadata['subject_title']}", style_meta), Paragraph(f"<b>Subject Code:</b> {metadata['subject_code']}", style_meta)],
+        [Paragraph(f"<b>Course / Subject:</b> {metadata['subject_title']}", style_meta), Paragraph(f"<b>Subject Code:</b> {subj_code_display}", style_meta)],
         [Paragraph(f"<b>Date of Exam:</b> {metadata['date']}", style_meta), Paragraph(f"<b>Duration:</b> {metadata['duration']}", style_meta)],
         [Paragraph(f"<b>Max Marks:</b> {metadata['max_marks']}", style_meta_bold), Paragraph("<b>Academic Year:</b> 2026-2027", style_meta)]
     ]
@@ -497,9 +499,10 @@ def generate_docx_paper(metadata: Dict[str, Any], sections: List[Dict[str, Any]]
     else:
         cell_text = header_table.cell(0, 0)
 
+    inst_display = metadata["institution_name"] if metadata["institution_name"].strip() else "NAME OF INSTITUTION / COLLEGE"
     p = cell_text.paragraphs[0]
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    p.add_run(metadata["institution_name"].upper() + "\n").bold = True
+    p.add_run(inst_display.upper() + "\n").bold = True
     p.add_run(metadata["department"].upper() + "\n")
     p.add_run(metadata["exam_name"].upper() + (" - ANSWER KEY" if is_answer_key else "")).bold = True
 
@@ -601,15 +604,46 @@ def main():
         if logo_file:
             st.session_state.metadata["logo_bytes"] = logo_file.read()
 
-        st.markdown("### 📋 Exam Metadata")
+        st.markdown("### 📋 Exam Metadata Header")
         meta = st.session_state.metadata
-        meta["institution_name"] = st.text_input("Institution Name", value=meta["institution_name"])
-        meta["department"] = st.text_input("Department", value=meta["department"])
-        meta["exam_name"] = st.text_input("Exam Name", value=meta["exam_name"])
-        meta["subject_title"] = st.text_input("Subject Title", value=meta["subject_title"])
-        meta["subject_code"] = st.text_input("Subject Code", value=meta["subject_code"])
-        meta["max_marks"] = st.number_input("Max Marks", value=meta["max_marks"])
-        meta["instructions"] = st.text_area("Instructions", value=meta["instructions"])
+        
+        # 1. College Name (Empty by default with Example Placeholder)
+        meta["institution_name"] = st.text_input(
+            "Institution / College Name", 
+            value=meta["institution_name"], 
+            placeholder="e.g. Royal Institute of Technology & Science"
+        )
+        
+        # 2. Department Dropdown
+        dept_options = ["B.Tech", "M.Tech", "BCA", "MCA", "Arts", "Science", "BA", "MA", "B.Sc", "M.Sc", "Commerce", "Other"]
+        curr_dept_idx = dept_options.index(meta["department"]) if meta["department"] in dept_options else 0
+        meta["department"] = st.selectbox("Department / Course Stream", dept_options, index=curr_dept_idx)
+        
+        # 3. Exam Name Selection Dropdown
+        exam_options = ["CA1", "Mid Semester Exam", "CA2", "End Semester Exam", "Practice Test", "Class Test", "Assignment Test"]
+        curr_exam_idx = exam_options.index(meta["exam_name"]) if meta["exam_name"] in exam_options else 1
+        meta["exam_name"] = st.selectbox("Examination Name", exam_options, index=curr_exam_idx)
+        
+        meta["subject_title"] = st.text_input("Course / Subject Name", value=meta["subject_title"])
+        
+        # 4. Subject Code (Empty by default with Example Placeholder)
+        meta["subject_code"] = st.text_input(
+            "Subject Code", 
+            value=meta["subject_code"], 
+            placeholder="e.g. CS-8001"
+        )
+        
+        # 5. Selective Max Marks Dropdown (20, 60, 70, 80, 100)
+        marks_options = [20, 60, 70, 80, 100]
+        curr_marks_idx = marks_options.index(meta["max_marks"]) if meta["max_marks"] in marks_options else 4
+        meta["max_marks"] = st.selectbox("Maximum Target Marks", marks_options, index=curr_marks_idx)
+        
+        # 6. General Guidelines & Instructions (Formatted Bullet Points)
+        meta["instructions"] = st.text_area(
+            "General Instructions & Guidelines (1 rule per line)", 
+            value=meta["instructions"], 
+            height=130
+        )
 
     tab_builder, tab_ai, tab_audit, tab_parser, tab_bank, tab_randomizer, tab_export = st.tabs([
         "📝 Paper Builder", "🤖 AI Generator", "📊 AI Syllabus Audit", "📂 Parser", "🗄️ Question Bank", "🔀 Randomizer", "🚀 Export"
